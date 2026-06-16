@@ -17,7 +17,7 @@
 // === КОНФІГУРАЦІЯ ===
 // Вкажіть URL вашого бекенду (Hugging Face Space URL), наприклад:
 // const API_BASE_URL = 'https://username-tg-wallet-backend.hf.space';
-const API_BASE_URL = 'https://ripper221-bot.hf.space';
+const API_BASE_URL = 'https://budget-ripper.onrender.com';
 
 /* ---------- Category Color Palette ---------- */
 const CATEGORY_COLORS = [
