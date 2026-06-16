@@ -685,6 +685,43 @@ async def delete_limit(
     return {"detail": "Ліміт видалено"}
 
 
+# --- Дебаг та діагностика ---
+
+@app.get("/api/debug")
+async def debug_info():
+    import aiohttp
+    telegram_ok = False
+    telegram_err = None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://api.telegram.org/bot{BOT_TOKEN}/getMe", timeout=5) as resp:
+                telegram_ok = resp.status == 200
+                telegram_err = await resp.text()
+    except Exception as e:
+        telegram_err = str(e)
+
+    webhook_register_err = None
+    webhook_url = f"{APP_URL.rstrip('/')}/webhook" if APP_URL else ""
+    if APP_URL:
+        try:
+            await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
+        except Exception as e:
+            webhook_register_err = str(e)
+
+    return {
+        "bot_token_configured": bool(BOT_TOKEN),
+        "bot_token_prefix": BOT_TOKEN[:10] if BOT_TOKEN else "",
+        "database_url_configured": bool(DATABASE_URL),
+        "webapp_url_configured": bool(WEBAPP_URL),
+        "app_url_configured": bool(APP_URL),
+        "app_url": APP_URL,
+        "webhook_url": webhook_url,
+        "telegram_api_reachable": telegram_ok,
+        "telegram_api_response_or_error": telegram_err,
+        "webhook_register_error_on_debug_call": webhook_register_err
+    }
+
+
 # --- Категорії ---
 
 @app.get("/api/categories")
