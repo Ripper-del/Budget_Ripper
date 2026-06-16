@@ -301,23 +301,27 @@ async def check_and_notify_limit(
 @dp.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     """Обробник команди /start — надсилає кнопку для відкриття Mini App."""
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="💰 Відкрити гаманець",
-                    web_app=WebAppInfo(url=WEBAPP_URL),
-                )
+    try:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💰 Відкрити гаманець",
+                        web_app=WebAppInfo(url=WEBAPP_URL),
+                    )
+                ]
             ]
-        ]
-    )
-    await message.answer(
-        "👋 <b>Ласкаво просимо до Wallet Tracker!</b>\n\n"
-        "Я допоможу вам відстежувати витрати, встановлювати ліміти "
-        "за категоріями та аналізувати витрати.\n\n"
-        "Натисніть кнопку нижче, щоб відкрити додаток:",
-        reply_markup=keyboard,
-    )
+        )
+        await message.answer(
+            "👋 <b>Ласкаво просимо до Wallet Tracker!</b>\n\n"
+            "Я допоможу вам відстежувати витрати, встановлювати ліміти "
+            "за категоріями та аналізувати витрати.\n\n"
+            "Натисніть кнопку нижче, щоб відкрити додаток:",
+            reply_markup=keyboard,
+        )
+    except Exception as e:
+        logger.error("Помилка в /start: %s | WEBAPP_URL=%s", e, WEBAPP_URL)
+        await message.answer(f"❌ Помилка запуску. Зверніться до адміністратора.\nДеталі: {e}")
 
 
 # ===========================
@@ -731,7 +735,8 @@ async def debug_info():
         "telegram_api_reachable": telegram_ok,
         "telegram_api_response_or_error": telegram_err,
         "webhook_register_error_on_debug_call": webhook_register_err,
-        "telegram_webhook_info": webhook_info
+        "telegram_webhook_info": webhook_info,
+        "webapp_url": WEBAPP_URL
     }
 
 
