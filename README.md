@@ -1,14 +1,4 @@
----
-title: Budget Ripper Backend
-emoji: 💰
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
-# 💰 Budget Ripper — Telegram Mini App
+# Budget Ripper — Telegram Mini App
 
 Персональний трекер витрат прямо в Telegram. Додавай витрати, встановлюй ліміти за категоріями та стеж за своїми фінансами — все в одному зручному міні-додатку.
 
