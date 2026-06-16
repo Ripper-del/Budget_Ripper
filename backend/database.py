@@ -26,6 +26,14 @@ if not DATABASE_URL:
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+# Вилучаємо query-параметри (наприклад, ?sslmode=require), які не підтримуються asyncpg
+# і замінюємо їх на ssl=True у connect_args
+connect_args = {}
+if "?" in DATABASE_URL:
+    if "sslmode" in DATABASE_URL:
+        connect_args["ssl"] = True
+    DATABASE_URL = DATABASE_URL.split("?")[0]
+
 # Створюємо асинхронний рушій SQLAlchemy
 async_engine = create_async_engine(
     DATABASE_URL,
@@ -33,6 +41,7 @@ async_engine = create_async_engine(
     pool_pre_ping=True,  # перевірка з'єднання перед використанням
     pool_size=3,
     max_overflow=5,
+    connect_args=connect_args,
 )
 
 # Фабрика асинхронних сесій
