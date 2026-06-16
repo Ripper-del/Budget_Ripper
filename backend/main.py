@@ -708,6 +708,18 @@ async def debug_info():
         except Exception as e:
             webhook_register_err = str(e)
 
+    # Перевіряємо реальний статус вебхука в Telegram
+    webhook_info = None
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/getWebhookInfo",
+                timeout=5
+            ) as resp:
+                webhook_info = await resp.json()
+    except Exception as e:
+        webhook_info = {"error": str(e)}
+
     return {
         "bot_token_configured": bool(BOT_TOKEN),
         "bot_token_prefix": BOT_TOKEN[:10] if BOT_TOKEN else "",
@@ -718,7 +730,8 @@ async def debug_info():
         "webhook_url": webhook_url,
         "telegram_api_reachable": telegram_ok,
         "telegram_api_response_or_error": telegram_err,
-        "webhook_register_error_on_debug_call": webhook_register_err
+        "webhook_register_error_on_debug_call": webhook_register_err,
+        "telegram_webhook_info": webhook_info
     }
 
 
