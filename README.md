@@ -1,3 +1,13 @@
+---
+title: Budget Ripper Backend
+emoji: 💰
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 💰 Telegram Mini App — Гаманець
 
 Персональний трекер витрат всередині Telegram. Додавайте витрати, встановлюйте ліміти за категоріями та слідкуйте за аналітикою — усе безпосередньо в месенджері.
