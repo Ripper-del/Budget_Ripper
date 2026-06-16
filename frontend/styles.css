@@ -338,9 +338,35 @@ body::before {
    ADD TRANSACTION
    ================================================================ */
 
+/* Add screen: sticky amount top + scrollable body */
+.screen-add {
+  padding: 0;
+  overflow: hidden;
+}
+
+.screen-add.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-sticky-top {
+  padding: 16px 16px 0;
+  flex-shrink: 0;
+}
+
+.add-scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 16px calc(var(--nav-height) + var(--safe-bottom) + 24px);
+  scrollbar-width: none;
+}
+
+.add-scroll-body::-webkit-scrollbar { display: none; }
+
 .amount-input-wrapper {
-  padding: 36px 24px;
-  margin-bottom: 20px;
+  padding: 28px 24px;
+  margin-bottom: 0;
   text-align: center;
   background:
     linear-gradient(rgba(17,17,32,0.96), rgba(17,17,32,0.96)) padding-box,
@@ -417,7 +443,23 @@ body::before {
   box-shadow: 0 0 24px rgba(99,102,241,0.2);
 }
 
-.category-card-emoji { font-size: 26px; }
+.category-card-emoji {
+  font-size: 26px;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.05);
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: all var(--transition);
+}
+
+.category-card.selected .category-card-emoji {
+  background: linear-gradient(135deg, rgba(99,102,241,0.22), rgba(217,70,239,0.15));
+  border-color: rgba(99,102,241,0.35);
+}
 
 .category-card-label {
   font-size: 11px;

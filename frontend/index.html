@@ -51,33 +51,36 @@
     </section>
 
     <!-- ===================== ADD TRANSACTION ===================== -->
-    <section id="screen-add" class="screen">
-      <header class="screen-header">
-        <h1 class="screen-title">Додати витрату</h1>
-      </header>
-
-      <div class="amount-input-wrapper glass-card">
-        <div class="amount-field">
-          <input type="text" id="add-amount" inputmode="decimal" placeholder="0" autocomplete="off">
-          <span class="currency-symbol">₴</span>
+    <section id="screen-add" class="screen screen-add">
+      <div class="add-sticky-top">
+        <header class="screen-header">
+          <h1 class="screen-title">Додати витрату</h1>
+        </header>
+        <div class="amount-input-wrapper">
+          <div class="amount-field">
+            <input type="text" id="add-amount" inputmode="decimal" placeholder="0" autocomplete="off">
+            <span class="currency-symbol">₴</span>
+          </div>
         </div>
       </div>
 
-      <div class="categories-section">
-        <h2 class="section-title">Категорія</h2>
-        <div class="categories-grid" id="add-categories"></div>
-      </div>
-
-      <div class="description-section">
-        <div class="input-group glass-card">
-          <input type="text" id="add-description" placeholder="Опис (необов'язково)" autocomplete="off">
+      <div class="add-scroll-body">
+        <div class="categories-section">
+          <h2 class="section-title">Категорія</h2>
+          <div class="categories-grid" id="add-categories"></div>
         </div>
-      </div>
 
-      <button class="submit-btn" id="add-submit" disabled>
-        <span class="btn-text">Додати витрату</span>
-        <span class="btn-loader" id="add-loader"></span>
-      </button>
+        <div class="description-section">
+          <div class="input-group glass-card">
+            <input type="text" id="add-description" placeholder="Опис (необов'язково)" autocomplete="off">
+          </div>
+        </div>
+
+        <button class="submit-btn" id="add-submit" disabled>
+          <span class="btn-text">Додати витрату</span>
+          <span class="btn-loader" id="add-loader"></span>
+        </button>
+      </div>
     </section>
 
     <!-- ===================== ANALYTICS ===================== -->

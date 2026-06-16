@@ -355,12 +355,17 @@ function drawDonutChart(canvasId, data, size) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const totalFontSize = size >= 260 ? 22 : 18;
+  const centerText = total >= 1000000
+    ? (total / 1000000).toFixed(1).replace('.0', '') + 'М ₴'
+    : total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₴';
+
+  const baseFontSize = size >= 260 ? 22 : 18;
+  const totalFontSize = centerText.length > 9 ? Math.round(baseFontSize * 0.75) : baseFontSize;
   const labelFontSize = size >= 260 ? 11 : 10;
 
   ctx.font = '700 ' + totalFontSize + 'px Inter, sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(formatMoneyShort(total), cx, cy - 4);
+  ctx.fillText(centerText, cx, cy - 4);
 
   ctx.font = '500 ' + labelFontSize + 'px Inter, sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
