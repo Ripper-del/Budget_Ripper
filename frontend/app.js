@@ -325,15 +325,23 @@ function drawDonutChart(canvasId, data, size) {
 
   let startAngle = -Math.PI / 2;
 
+  /* Мінімальний кут для видимості малих сегментів (~4°) */
+  const MIN_ANGLE = 0.07;
+  const rawAngles = data.map(item => (item.value / total) * Math.PI * 2);
+  const displayAngles = rawAngles.map(a => (a > 0 && a < MIN_ANGLE) ? MIN_ANGLE : a);
+  const displayTotal = displayAngles.reduce((s, a) => s + a, 0);
+  const scale = (Math.PI * 2) / displayTotal;
+  const scaledAngles = displayAngles.map(a => a * scale);
+
   /* Тінь */
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 12;
   ctx.shadowOffsetY = 4;
 
-  data.forEach((item) => {
-    const sliceAngle = (item.value / total) * Math.PI * 2;
-    const effectiveGap = data.length > 1 ? gapAngle : 0;
+  data.forEach((item, i) => {
+    const sliceAngle = scaledAngles[i];
+    const effectiveGap = (data.length > 1 && rawAngles[i] > gapAngle * 3) ? gapAngle : 0;
     const drawStart = startAngle + effectiveGap / 2;
     const drawEnd = startAngle + sliceAngle - effectiveGap / 2;
 
