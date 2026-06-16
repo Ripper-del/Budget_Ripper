@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>Гаманець</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <section id="screen-dashboard" class="screen active">
+      <header class="screen-header">
+        <h1 class="screen-title">Головна</h1>
+        <span class="screen-subtitle" id="dashboard-month"></span>
+      </header>
+
+      <div class="total-card glass-card">
+        <span class="total-label">Витрачено цього місяця</span>
+        <span class="total-amount" id="dashboard-total">0 ₴</span>
+      </div>
+
+      <div class="chart-section glass-card">
+        <h2 class="section-title">За категоріями</h2>
+        <div class="chart-wrapper">
+          <canvas id="dashboard-chart" width="220" height="220"></canvas>
+        </div>
+        <div class="chart-legend" id="dashboard-legend"></div>
+      </div>
+
+      <div class="limits-overview" id="dashboard-limits">
+        <h2 class="section-title">Ліміти</h2>
+        <div id="dashboard-limits-list"></div>
+      </div>
+
+      <div class="recent-section">
+        <h2 class="section-title">Останні витрати</h2>
+        <div class="transactions-list" id="dashboard-transactions">
+          <div class="empty-state">
+            <span class="empty-icon">📭</span>
+            <span class="empty-text">Поки немає витрат</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ADD TRANSACTION ===================== -->
+    <section id="screen-add" class="screen">
+      <header class="screen-header">
+        <h1 class="screen-title">Додати витрату</h1>
+      </header>
+
+      <div class="amount-input-wrapper glass-card">
+        <div class="amount-field">
+          <input type="text" id="add-amount" inputmode="decimal" placeholder="0" autocomplete="off">
+          <span class="currency-symbol">₴</span>
+        </div>
+      </div>
+
+      <div class="categories-section">
+        <h2 class="section-title">Категорія</h2>
+        <div class="categories-grid" id="add-categories"></div>
+      </div>
+
+      <div class="description-section">
+        <div class="input-group glass-card">
+          <input type="text" id="add-description" placeholder="Опис (необов'язково)" autocomplete="off">
+        </div>
+      </div>
+
+      <button class="submit-btn" id="add-submit" disabled>
+        <span class="btn-text">Додати витрату</span>
+        <span class="btn-loader" id="add-loader"></span>
+      </button>
+
+      <div class="add-success-overlay" id="add-success">
+        <div class="success-content">
+          <div class="success-icon">✓</div>
+          <span class="success-text">Витрату додано!</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ANALYTICS ===================== -->
+    <section id="screen-analytics" class="screen">
+      <header class="screen-header">
+        <h1 class="screen-title">Аналітика</h1>
+      </header>
+
+      <div class="analytics-chart-card glass-card">
+        <div class="chart-wrapper chart-wrapper-lg">
+          <canvas id="analytics-chart" width="280" height="280"></canvas>
+        </div>
+      </div>
+
+      <div class="analytics-breakdown">
+        <h2 class="section-title">Деталізація</h2>
+        <div class="breakdown-list" id="analytics-breakdown"></div>
+      </div>
+
+      <div class="analytics-limits-section" id="analytics-limits-section">
+        <h2 class="section-title">Використання лімітів</h2>
+        <div id="analytics-limits-bars"></div>
+      </div>
+    </section>
+
+    <!-- ===================== LIMITS ===================== -->
+    <section id="screen-limits" class="screen">
+      <header class="screen-header">
+        <h1 class="screen-title">Ліміти</h1>
+      </header>
+
+      <div class="limits-list" id="limits-list">
+        <div class="empty-state">
+          <span class="empty-icon">📊</span>
+          <span class="empty-text">Ліміти не встановлені</span>
+        </div>
+      </div>
+
+      <button class="fab-btn" id="limits-add-btn">
+        <span>+</span>
+      </button>
+    </section>
+
+    <!-- ===================== BOTTOM NAV ===================== -->
+    <nav class="bottom-nav glass-nav">
+      <button class="nav-tab active" data-screen="dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Головна</span>
+      </button>
+      <button class="nav-tab" data-screen="add">
+        <span class="nav-icon nav-icon-add">➕</span>
+        <span class="nav-label">Додати</span>
+      </button>
+      <button class="nav-tab" data-screen="analytics">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Аналітика</span>
+      </button>
+      <button class="nav-tab" data-screen="limits">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Ліміти</span>
+      </button>
+    </nav>
+
+    <!-- ===================== ADD LIMIT MODAL ===================== -->
+    <div class="modal-overlay" id="limit-modal-overlay">
+      <div class="modal-sheet glass-card" id="limit-modal">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">Новий ліміт</h2>
+
+        <div class="modal-field">
+          <label class="modal-label">Категорія</label>
+          <div class="modal-select-wrapper glass-card">
+            <select id="limit-category" class="modal-select">
+              <option value="" disabled selected>Оберіть категорію</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label">Сума ліміту</label>
+          <div class="modal-input-wrapper glass-card">
+            <input type="text" id="limit-amount" inputmode="decimal" placeholder="0" autocomplete="off">
+            <span class="currency-symbol-sm">₴</span>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" id="limit-cancel">Скасувати</button>
+          <button class="modal-btn modal-btn-save" id="limit-save">Зберегти</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== TOAST ===================== -->
+    <div class="toast" id="toast">
+      <span class="toast-text" id="toast-text"></span>
+    </div>
+
+    <!-- ===================== GLOBAL LOADER ===================== -->
+    <div class="global-loader" id="global-loader">
+      <div class="loader-spinner"></div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
