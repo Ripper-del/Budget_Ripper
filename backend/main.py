@@ -338,8 +338,24 @@ async def lifespan(app: FastAPI):
 
     if APP_URL:
         webhook_url = f"{APP_URL.rstrip('/')}/webhook"
-        await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
-        logger.info("Вебхук встановлено: %s", webhook_url)
+        
+        async def setup_webhook_with_retry():
+            import asyncio
+            for i in range(12):  # пробуємо до 12 разів (1 хвилина)
+                try:
+                    await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
+                    logger.info("Вебхук успішно встановлено: %s", webhook_url)
+                    return
+                except Exception as e:
+                    logger.warning(
+                        "Спроба %d: Не вдалося встановити вебхук: %s. Повтор за 5 секунд...",
+                        i + 1, e
+                    )
+                    await asyncio.sleep(5)
+            logger.error("Не вдалося встановити вебхук після 12 спроб.")
+
+        import asyncio
+        asyncio.create_task(setup_webhook_with_retry())
 
     yield
 
