@@ -489,7 +489,7 @@ body::before {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  margin: -11px 0 0 -11px;
   width: 22px;
   height: 22px;
   border: 2.5px solid rgba(255,255,255,0.3);
