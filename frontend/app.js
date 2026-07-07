@@ -1,32 +1,16 @@
 /* ================================================================
    TELEGRAM MINI APP — WALLET / EXPENSE TRACKER
    Vanilla JS  •  No frameworks
-   ================================================================
-
-   Backend API contract:
-   - GET  /api/categories       → [{name, icon}, ...]
-   - POST /api/transactions     → {category: string, amount: float, description?: string}
-   - GET  /api/transactions     → [{id, amount, category, description, created_at}, ...]
-   - DELETE /api/transactions/:id
-   - GET  /api/analytics        → {total_spent, categories: [{category, total, limit_amount?, percentage?}], period_start, period_end}
-   - POST /api/limits           → {category: string, limit_amount: float, period?: string}
-   - GET  /api/limits           → [{id, category, limit_amount, period, spent}, ...]
-   - DELETE /api/limits/:id
    ================================================================ */
 
-// === КОНФІГУРАЦІЯ ===
-// Вкажіть URL вашого бекенду (Hugging Face Space URL), наприклад:
-// const API_BASE_URL = 'https://username-tg-wallet-backend.hf.space';
 const API_BASE_URL = 'https://budget-ripper.onrender.com';
 
-/* ---------- Category Color Palette ---------- */
 const CATEGORY_COLORS = [
   '#667eea', '#764ba2', '#f093fb', '#f5576c',
   '#4facfe', '#00f2fe', '#43e97b', '#fa709a',
   '#fee140', '#ffa751', '#a18cd1', '#fbc2eb'
 ];
 
-/* ---------- Month Names ---------- */
 const MONTH_NAMES = [
   'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
   'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'
@@ -38,15 +22,19 @@ const MONTH_NAMES = [
 const state = {
   currentScreen: 'dashboard',
   transactions: [],
-  categories: [],     // [{name: "Їжа", icon: "🍔"}, ...]
+  categories: [],
   limits: [],
   analytics: null,
-  selectedCategory: null,  // рядок — ім'я категорії, наприклад "Їжа"
-  isLoading: false
+  selectedCategory: null,
+  viewYear: new Date().getFullYear(),
+  viewMonth: new Date().getMonth()  // 0-indexed
 };
 
+/* Sub-screens: which nav tab stays highlighted */
+const SCREEN_PARENT = { history: 'dashboard' };
+
 /* ================================================================
-   TELEGRAM WEBAPP INIT
+   TELEGRAM WEBAPP
    ================================================================ */
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 
@@ -54,24 +42,16 @@ function initTelegram() {
   if (!tg) return;
   tg.ready();
   tg.expand();
-  if (tg.setHeaderColor) {
-    tg.setHeaderColor('#0a0a0f');
-  }
-  if (tg.setBackgroundColor) {
-    tg.setBackgroundColor('#0a0a0f');
-  }
+  if (tg.setHeaderColor) tg.setHeaderColor('#0a0a0f');
+  if (tg.setBackgroundColor) tg.setBackgroundColor('#0a0a0f');
 }
 
 function hapticImpact(style) {
-  try {
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style || 'light');
-  } catch (e) { /* ignore */ }
+  try { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style || 'light'); } catch (e) {}
 }
 
 function hapticNotification(type) {
-  try {
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type);
-  } catch (e) { /* ignore */ }
+  try { if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); } catch (e) {}
 }
 
 /* ================================================================
@@ -79,55 +59,71 @@ function hapticNotification(type) {
    ================================================================ */
 function formatMoney(amount) {
   const num = Math.abs(Number(amount) || 0);
-  const formatted = num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  return formatted + ' ₴';
-}
-
-function formatMoneyShort(amount) {
-  const num = Number(amount) || 0;
-  if (num >= 1000000) return (num / 1000000).toFixed(1).replace('.0', '') + 'М ₴';
-  if (num >= 1000) return (num / 1000).toFixed(1).replace('.0', '') + 'К ₴';
-  return num.toFixed(0) + ' ₴';
+  return num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₴';
 }
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
-  const day = d.getDate();
-  const month = MONTH_NAMES[d.getMonth()];
   const hours = String(d.getHours()).padStart(2, '0');
   const mins = String(d.getMinutes()).padStart(2, '0');
-  return day + ' ' + month.substring(0, 3).toLowerCase() + ', ' + hours + ':' + mins;
+  return d.getDate() + ' ' + MONTH_NAMES[d.getMonth()].substring(0, 3).toLowerCase() + ', ' + hours + ':' + mins;
 }
 
-function getCategoryColor(index) {
-  return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+function getDayLabel(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const toDate = (dt) => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()).getTime();
+  const diff = toDate(now) - toDate(d);
+  if (diff === 0) return 'Сьогодні';
+  if (diff === 86400000) return 'Вчора';
+  return d.getDate() + ' ' + MONTH_NAMES[d.getMonth()];
 }
 
-/** Знайти іконку категорії за ім'ям */
+/* Stable color by djb2 hash of category name */
+function getCategoryColorStable(categoryName) {
+  let h = 5381;
+  for (let i = 0; i < categoryName.length; i++) {
+    h = ((h << 5) + h) + categoryName.charCodeAt(i);
+    h = h & h;
+  }
+  return CATEGORY_COLORS[Math.abs(h) % CATEGORY_COLORS.length];
+}
+
 function getCategoryIcon(categoryName) {
   const cat = state.categories.find(c => c.name === categoryName);
   return cat ? cat.icon : '💼';
 }
 
-/** Знайти індекс категорії за ім'ям (для кольору) */
-function getCategoryIndex(categoryName) {
-  const idx = state.categories.findIndex(c => c.name === categoryName);
-  return idx >= 0 ? idx : 0;
+function isCurrentMonth() {
+  const now = new Date();
+  return state.viewYear === now.getFullYear() && state.viewMonth === now.getMonth();
 }
 
 function getAuthHeader() {
   return (tg && tg.initData) ? tg.initData : '';
 }
 
-function $(id) {
-  return document.getElementById(id);
-}
+function $(id) { return document.getElementById(id); }
 
 function escapeHtml(str) {
   if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* Compute analytics totals from raw transaction list (used for past months) */
+function computeAnalyticsFromTransactions(transactions) {
+  const map = {};
+  let totalSpent = 0;
+  (transactions || []).forEach(tx => {
+    totalSpent += tx.amount;
+    map[tx.category] = (map[tx.category] || 0) + tx.amount;
+  });
+  const categories = Object.entries(map)
+    .map(([category, total]) => ({ category, total }))
+    .sort((a, b) => b.total - a.total);
+  return { total_spent: totalSpent, categories };
 }
 
 /* ================================================================
@@ -136,8 +132,7 @@ function escapeHtml(str) {
 let toastTimer = null;
 function showToast(message, duration) {
   const toast = $('toast');
-  const text = $('toast-text');
-  text.textContent = message;
+  $('toast-text').textContent = message;
   toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), duration || 2500);
@@ -146,30 +141,21 @@ function showToast(message, duration) {
 /* ================================================================
    GLOBAL LOADER
    ================================================================ */
-function showLoader() {
-  $('global-loader').classList.add('show');
-}
-
-function hideLoader() {
-  $('global-loader').classList.remove('show');
-}
+function showLoader() { $('global-loader').classList.add('show'); }
+function hideLoader() { $('global-loader').classList.remove('show'); }
 
 /* ================================================================
    API MODULE
    ================================================================ */
 const api = {
   async request(method, path, body) {
-    const url = API_BASE_URL + path;
     const opts = {
-      method: method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': getAuthHeader()
-      }
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': getAuthHeader() }
     };
     if (body) opts.body = JSON.stringify(body);
     try {
-      const res = await fetch(url, opts);
+      const res = await fetch(API_BASE_URL + path, opts);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || err.message || 'Помилка сервера');
@@ -177,58 +163,22 @@ const api = {
       if (res.status === 204) return null;
       return await res.json();
     } catch (e) {
-      if (e.name === 'TypeError' && e.message.includes('fetch')) {
-        throw new Error('Немає підключення до сервера');
-      }
+      if (e.name === 'TypeError' && e.message.includes('fetch')) throw new Error('Немає підключення до сервера');
       throw e;
     }
   },
-
-  // Категорії: GET /api/categories → [{name, icon}, ...]
-  getCategories() {
-    return this.request('GET', '/api/categories');
-  },
-
-  // Транзакції: GET /api/transactions?period=current_month
-  getTransactions(period) {
-    const q = period ? '?period=' + period : '';
+  getCategories()             { return this.request('GET', '/api/categories'); },
+  getTransactions(period, limit) {
+    let q = '?period=' + (period || 'all');
+    if (limit) q += '&limit=' + limit;
     return this.request('GET', '/api/transactions' + q);
   },
-
-  // Додавання витрати: POST /api/transactions — {category: "Їжа", amount: 500, description: ""}
-  addTransaction(category, amount, description) {
-    return this.request('POST', '/api/transactions', {
-      category: category,
-      amount: amount,
-      description: description || null
-    });
-  },
-
-  deleteTransaction(id) {
-    return this.request('DELETE', '/api/transactions/' + id);
-  },
-
-  // Аналітика: GET /api/analytics → {total_spent, categories: [{category, total, limit_amount?, percentage?}]}
-  getAnalytics() {
-    return this.request('GET', '/api/analytics');
-  },
-
-  // Ліміти: GET /api/limits → [{id, category, limit_amount, period, spent}, ...]
-  getLimits() {
-    return this.request('GET', '/api/limits');
-  },
-
-  // Створення ліміту: POST /api/limits — {category: "Їжа", limit_amount: 5000}
-  addLimit(category, limitAmount) {
-    return this.request('POST', '/api/limits', {
-      category: category,
-      limit_amount: limitAmount
-    });
-  },
-
-  deleteLimit(id) {
-    return this.request('DELETE', '/api/limits/' + id);
-  }
+  addTransaction(cat, amt, desc) { return this.request('POST', '/api/transactions', { category: cat, amount: amt, description: desc || null }); },
+  deleteTransaction(id)       { return this.request('DELETE', '/api/transactions/' + id); },
+  getAnalytics()              { return this.request('GET', '/api/analytics'); },
+  getLimits()                 { return this.request('GET', '/api/limits'); },
+  addLimit(cat, amt)          { return this.request('POST', '/api/limits', { category: cat, limit_amount: amt }); },
+  deleteLimit(id)             { return this.request('DELETE', '/api/limits/' + id); }
 };
 
 /* ================================================================
@@ -246,8 +196,10 @@ function navigateTo(screen) {
 
   state.currentScreen = screen;
 
+  /* Highlight correct nav tab (history → dashboard) */
+  const activeTab = SCREEN_PARENT[screen] || screen;
   document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.screen === screen);
+    tab.classList.toggle('active', tab.dataset.screen === activeTab);
   });
 
   setTimeout(() => {
@@ -255,9 +207,7 @@ function navigateTo(screen) {
     if (next) {
       next.classList.add('active');
       next.scrollTop = 0;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => next.classList.add('visible'));
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => next.classList.add('visible')));
     }
     loadScreenData(screen);
   }, current ? 100 : 0);
@@ -275,10 +225,55 @@ function initNavigation() {
 async function loadScreenData(screen) {
   switch (screen) {
     case 'dashboard': await loadDashboard(); break;
-    case 'add': await loadAddScreen(); break;
+    case 'add':       await loadAddScreen(); break;
     case 'analytics': await loadAnalytics(); break;
-    case 'limits': await loadLimits(); break;
+    case 'limits':    await loadLimits(); break;
+    case 'history':   await loadHistory(); break;
   }
+}
+
+/* ================================================================
+   SKELETON LOADERS
+   ================================================================ */
+function showDashboardSkeleton() {
+  /* Total amount */
+  const totalEl = $('dashboard-total');
+  if (totalEl) totalEl.classList.add('loading');
+
+  /* Transactions list */
+  const txList = $('dashboard-transactions');
+  if (txList) {
+    txList.innerHTML = [0, 1, 2].map(() =>
+      '<div class="skeleton-tx">' +
+        '<div class="skeleton" style="width:44px;height:44px;border-radius:13px;flex-shrink:0;"></div>' +
+        '<div style="flex:1;display:flex;flex-direction:column;gap:8px;">' +
+          '<div class="skeleton" style="height:13px;width:58%;"></div>' +
+          '<div class="skeleton" style="height:11px;width:38%;"></div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">' +
+          '<div class="skeleton" style="height:13px;width:68px;"></div>' +
+          '<div class="skeleton" style="height:11px;width:48px;"></div>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  }
+}
+
+/* ================================================================
+   ERROR STATE
+   ================================================================ */
+function showErrorState(containerId, onRetry) {
+  const el = $(containerId);
+  if (!el) return;
+  const btnId = 'retry-' + containerId;
+  el.innerHTML =
+    '<div class="error-state">' +
+      '<span class="error-icon">⚠️</span>' +
+      '<span class="error-text">Не вдалося завантажити дані</span>' +
+      '<button class="retry-btn" id="' + btnId + '">Спробувати знову</button>' +
+    '</div>';
+  const btn = $(btnId);
+  if (btn && onRetry) btn.addEventListener('click', onRetry);
 }
 
 /* ================================================================
@@ -298,23 +293,19 @@ function drawDonutChart(canvasId, data, size) {
   ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, size, size);
 
-  const cx = size / 2;
-  const cy = size / 2;
+  const cx = size / 2, cy = size / 2;
   const outerRadius = size / 2 - 4;
   const innerRadius = outerRadius * 0.62;
   const gapAngle = 0.04;
-
   const total = data.reduce((s, d) => s + d.value, 0);
 
   if (total === 0 || data.length === 0) {
-    /* Порожній стан — сіре кільце */
     ctx.beginPath();
     ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
     ctx.arc(cx, cy, innerRadius, Math.PI * 2, 0, true);
     ctx.closePath();
     ctx.fillStyle = 'rgba(255,255,255,0.04)';
     ctx.fill();
-
     ctx.font = '600 14px Inter, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.textAlign = 'center';
@@ -324,8 +315,6 @@ function drawDonutChart(canvasId, data, size) {
   }
 
   let startAngle = -Math.PI / 2;
-
-  /* Мінімальний кут для видимості малих сегментів (~4°) */
   const MIN_ANGLE = 0.07;
   const rawAngles = data.map(item => (item.value / total) * Math.PI * 2);
   const displayAngles = rawAngles.map(a => (a > 0 && a < MIN_ANGLE) ? MIN_ANGLE : a);
@@ -333,7 +322,6 @@ function drawDonutChart(canvasId, data, size) {
   const scale = (Math.PI * 2) / displayTotal;
   const scaledAngles = displayAngles.map(a => a * scale);
 
-  /* Тінь */
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 12;
@@ -344,7 +332,6 @@ function drawDonutChart(canvasId, data, size) {
     const effectiveGap = (data.length > 1 && rawAngles[i] > gapAngle * 3) ? gapAngle : 0;
     const drawStart = startAngle + effectiveGap / 2;
     const drawEnd = startAngle + sliceAngle - effectiveGap / 2;
-
     if (drawEnd > drawStart) {
       ctx.beginPath();
       ctx.arc(cx, cy, outerRadius, drawStart, drawEnd);
@@ -353,19 +340,17 @@ function drawDonutChart(canvasId, data, size) {
       ctx.fillStyle = item.color;
       ctx.fill();
     }
-
     startAngle += sliceAngle;
   });
 
   ctx.restore();
 
-  /* Текст у центрі */
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   const centerText = total >= 1000000
     ? (total / 1000000).toFixed(1).replace('.0', '') + 'М ₴'
-    : total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₴';
+    : total.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₴';
 
   const baseFontSize = size >= 260 ? 22 : 18;
   const totalFontSize = centerText.length > 9 ? Math.round(baseFontSize * 0.75) : baseFontSize;
@@ -381,63 +366,118 @@ function drawDonutChart(canvasId, data, size) {
 }
 
 /* ================================================================
+   MONTH NAVIGATION
+   ================================================================ */
+function prevMonth() {
+  hapticImpact('light');
+  if (state.viewMonth === 0) { state.viewMonth = 11; state.viewYear--; }
+  else state.viewMonth--;
+  loadDashboard();
+}
+
+function nextMonth() {
+  if (isCurrentMonth()) return;
+  hapticImpact('light');
+  if (state.viewMonth === 11) { state.viewMonth = 0; state.viewYear++; }
+  else state.viewMonth++;
+  loadDashboard();
+}
+
+function updateMonthNavUI() {
+  const monthLabel = $('dashboard-month');
+  if (monthLabel) monthLabel.textContent = MONTH_NAMES[state.viewMonth] + ' ' + state.viewYear;
+
+  const nextBtn = $('month-next');
+  if (nextBtn) {
+    nextBtn.disabled = isCurrentMonth();
+  }
+}
+
+function initMonthNav() {
+  const prev = $('month-prev');
+  const next = $('month-next');
+  if (prev) prev.addEventListener('click', prevMonth);
+  if (next) next.addEventListener('click', nextMonth);
+}
+
+/* ================================================================
    DASHBOARD
    ================================================================ */
 async function loadDashboard() {
-  const now = new Date();
-  const monthLabel = $('dashboard-month');
-  if (monthLabel) monthLabel.textContent = MONTH_NAMES[now.getMonth()] + ' ' + now.getFullYear();
+  updateMonthNavUI();
 
-  // Завантажуємо категорії в фоні, якщо вони ще не завантажені
+  /* Preload categories silently */
   if (state.categories.length === 0) {
     api.getCategories().then(cats => { state.categories = cats || []; }).catch(() => {});
   }
 
+  showDashboardSkeleton();
+
   try {
-    const [analytics, transactions, limits] = await Promise.all([
-      api.getAnalytics().catch(() => null),
-      api.getTransactions('current_month').catch(() => []),
-      api.getLimits().catch(() => [])
-    ]);
-
-    state.analytics = analytics;
-    state.transactions = transactions || [];
-    state.limits = limits || [];
-
-    renderDashboardTotal(analytics);
-    renderDashboardChart(analytics);
-    renderDashboardLimits(limits);
-    renderDashboardTransactions(state.transactions);
+    if (isCurrentMonth()) {
+      const [analytics, transactions, limits] = await Promise.all([
+        api.getAnalytics().catch(() => null),
+        api.getTransactions('current_month').catch(() => []),
+        api.getLimits().catch(() => [])
+      ]);
+      state.analytics = analytics;
+      state.transactions = transactions || [];
+      state.limits = limits || [];
+      renderDashboardTotal(analytics);
+      renderDashboardChart(analytics);
+      renderDashboardLimits(limits);
+      renderDashboardTransactions(state.transactions);
+    } else {
+      /* Past month: load all and filter client-side */
+      const [allTx, limits] = await Promise.all([
+        api.getTransactions('all', 200).catch(() => []),
+        api.getLimits().catch(() => [])
+      ]);
+      state.limits = limits || [];
+      const monthTx = (allTx || []).filter(tx => {
+        const d = new Date(tx.created_at);
+        return d.getFullYear() === state.viewYear && d.getMonth() === state.viewMonth;
+      });
+      const analytics = computeAnalyticsFromTransactions(monthTx);
+      state.analytics = analytics;
+      state.transactions = monthTx;
+      renderDashboardTotal(analytics);
+      renderDashboardChart(analytics);
+      renderDashboardLimits(limits);
+      renderDashboardTransactions(monthTx);
+    }
   } catch (e) {
-    showToast('Помилка завантаження: ' + e.message);
+    showErrorState('dashboard-transactions', loadDashboard);
+    showToast('Помилка: ' + e.message);
   }
 }
 
 function renderDashboardTotal(analytics) {
   const el = $('dashboard-total');
   if (!el) return;
+  el.classList.remove('loading');
   const total = analytics && analytics.total_spent != null ? analytics.total_spent : 0;
   el.textContent = formatMoney(total);
 }
 
 function renderDashboardChart(analytics) {
   const categories = analytics && analytics.categories ? analytics.categories : [];
-  const chartData = categories.map((cat, i) => ({
+  const chartData = categories.map(cat => ({
     label: cat.category,
     value: cat.total || 0,
-    color: getCategoryColor(getCategoryIndex(cat.category))
+    color: getCategoryColorStable(cat.category)
   }));
-
   drawDonutChart('dashboard-chart', chartData, 220);
 
   const legend = $('dashboard-legend');
-  if (!legend) return;
-  legend.innerHTML = chartData.map(d =>
-    '<div class="legend-item">' +
-      '<span class="legend-dot" style="background:' + d.color + '"></span>' +
-      '<span>' + escapeHtml(d.label) + '</span>' +
-    '</div>'
-  ).join('');
+  if (legend) {
+    legend.innerHTML = chartData.map(d =>
+      '<div class="legend-item">' +
+        '<span class="legend-dot" style="background:' + d.color + '"></span>' +
+        '<span>' + escapeHtml(d.label) + '</span>' +
+      '</div>'
+    ).join('');
+  }
 }
 
 function renderDashboardLimits(limits) {
@@ -454,7 +494,6 @@ function renderDashboardLimits(limits) {
 function renderDashboardTransactions(transactions) {
   const container = $('dashboard-transactions');
   if (!container) return;
-
   if (!transactions || transactions.length === 0) {
     container.innerHTML =
       '<div class="empty-state">' +
@@ -463,28 +502,124 @@ function renderDashboardTransactions(transactions) {
       '</div>';
     return;
   }
+  container.innerHTML = transactions.slice(0, 5).map((tx, i) => buildTransactionItem(tx, i)).join('');
+  attachDeleteHandlers(container, loadDashboard);
+}
 
-  // Показуємо максимум 5 останніх
-  const recent = transactions.slice(0, 5);
+/* ================================================================
+   TRANSACTION ITEM BUILDER (shared: dashboard + history)
+   ================================================================ */
+function buildTransactionItem(tx, i) {
+  const emoji = getCategoryIcon(tx.category);
+  const catName = escapeHtml(tx.category || 'Інше');
+  const desc = tx.description ? '<div class="transaction-desc">' + escapeHtml(tx.description) + '</div>' : '';
+  const amount = formatMoney(tx.amount);
+  const date = tx.created_at ? formatDate(tx.created_at) : '';
 
-  container.innerHTML = recent.map((tx, i) => {
-    const emoji = getCategoryIcon(tx.category);
-    const catName = tx.category || 'Інше';
-    const desc = tx.description || '';
-    const amount = formatMoney(tx.amount);
-    const date = tx.created_at ? formatDate(tx.created_at) : '';
-    return '<div class="transaction-item animate-in" style="animation-delay:' + (i * 0.06) + 's">' +
-      '<div class="transaction-emoji">' + emoji + '</div>' +
-      '<div class="transaction-info">' +
-        '<div class="transaction-category">' + escapeHtml(catName) + '</div>' +
-        (desc ? '<div class="transaction-desc">' + escapeHtml(desc) + '</div>' : '') +
+  return '<div class="transaction-item animate-in" data-id="' + tx.id + '" style="animation-delay:' + (i * 0.05) + 's">' +
+    '<div class="transaction-emoji">' + emoji + '</div>' +
+    '<div class="transaction-info">' +
+      '<div class="transaction-category">' + catName + '</div>' +
+      desc +
+    '</div>' +
+    '<div class="transaction-right">' +
+      '<div class="transaction-amount">−' + escapeHtml(amount) + '</div>' +
+      '<div class="transaction-date">' + date + '</div>' +
+    '</div>' +
+    '<button class="tx-delete-btn" data-id="' + tx.id + '" aria-label="Видалити">✕</button>' +
+  '</div>';
+}
+
+function attachDeleteHandlers(container, onDeleted) {
+  container.querySelectorAll('.tx-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      hapticImpact('medium');
+      const id = btn.dataset.id;
+      const item = container.querySelector('.transaction-item[data-id="' + id + '"]');
+      if (item) { item.style.opacity = '0.4'; item.style.pointerEvents = 'none'; }
+      try {
+        await api.deleteTransaction(id);
+        hapticNotification('success');
+        if (onDeleted) await onDeleted();
+      } catch (err) {
+        hapticNotification('error');
+        showToast('Помилка: ' + err.message);
+        if (item) { item.style.opacity = ''; item.style.pointerEvents = ''; }
+      }
+    });
+  });
+}
+
+/* ================================================================
+   HISTORY (All transactions)
+   ================================================================ */
+async function loadHistory() {
+  const container = $('history-list');
+  if (!container) return;
+
+  container.innerHTML = [0, 1, 2, 3, 4].map(() =>
+    '<div class="skeleton-tx">' +
+      '<div class="skeleton" style="width:44px;height:44px;border-radius:13px;flex-shrink:0;"></div>' +
+      '<div style="flex:1;display:flex;flex-direction:column;gap:8px;">' +
+        '<div class="skeleton" style="height:13px;width:55%;"></div>' +
+        '<div class="skeleton" style="height:11px;width:36%;"></div>' +
       '</div>' +
-      '<div class="transaction-right">' +
-        '<div class="transaction-amount">−' + escapeHtml(amount) + '</div>' +
-        '<div class="transaction-date">' + date + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
+      '<div class="skeleton" style="height:13px;width:68px;flex-shrink:0;"></div>' +
+    '</div>'
+  ).join('');
+
+  try {
+    /* Ensure categories are loaded for icons */
+    if (state.categories.length === 0) {
+      state.categories = await api.getCategories().catch(() => []);
+    }
+    const transactions = await api.getTransactions('all', 200);
+    renderHistory(transactions || []);
+  } catch (e) {
+    showErrorState('history-list', loadHistory);
+  }
+}
+
+function renderHistory(transactions) {
+  const container = $('history-list');
+  if (!container) return;
+
+  if (!transactions || transactions.length === 0) {
+    container.innerHTML =
+      '<div class="empty-state">' +
+        '<span class="empty-icon">📭</span>' +
+        '<span class="empty-text">Немає жодної витрати</span>' +
+      '</div>';
+    return;
+  }
+
+  /* Group by day */
+  const groups = {};
+  const order = [];
+  transactions.forEach(tx => {
+    const label = getDayLabel(tx.created_at);
+    if (!groups[label]) { groups[label] = []; order.push(label); }
+    groups[label].push(tx);
+  });
+
+  let idx = 0;
+  let html = '';
+  order.forEach(label => {
+    html += '<div class="tx-date-group">' + escapeHtml(label) + '</div>';
+    html += groups[label].map(tx => buildTransactionItem(tx, idx++)).join('');
+  });
+
+  container.innerHTML = html;
+  attachDeleteHandlers(container, loadHistory);
+}
+
+function initHistory() {
+  const backBtn = $('history-back');
+  if (backBtn) backBtn.addEventListener('click', () => navigateTo('dashboard'));
+
+  const seeAllBtn = $('dashboard-see-all');
+  if (seeAllBtn) seeAllBtn.addEventListener('click', () => navigateTo('history'));
 }
 
 /* ================================================================
@@ -493,8 +628,7 @@ function renderDashboardTransactions(transactions) {
 async function loadAddScreen() {
   if (state.categories.length === 0) {
     try {
-      const cats = await api.getCategories();
-      state.categories = cats || [];
+      state.categories = await api.getCategories();
     } catch (e) {
       showToast('Не вдалося завантажити категорії');
     }
@@ -505,14 +639,11 @@ async function loadAddScreen() {
 function renderCategories() {
   const grid = $('add-categories');
   if (!grid) return;
-
   grid.innerHTML = state.categories.map(cat => {
-    const name = cat.name;
-    const emoji = cat.icon || '📦';
-    const selected = state.selectedCategory === name ? ' selected' : '';
-    return '<button class="category-card' + selected + '" data-name="' + escapeHtml(name) + '">' +
-      '<span class="category-card-emoji">' + emoji + '</span>' +
-      '<span class="category-card-label">' + escapeHtml(name) + '</span>' +
+    const sel = state.selectedCategory === cat.name ? ' selected' : '';
+    return '<button class="category-card' + sel + '" data-name="' + escapeHtml(cat.name) + '">' +
+      '<span class="category-card-emoji">' + (cat.icon || '📦') + '</span>' +
+      '<span class="category-card-label">' + escapeHtml(cat.name) + '</span>' +
     '</button>';
   }).join('');
 
@@ -529,31 +660,23 @@ function renderCategories() {
 
 function initAddScreen() {
   const amountInput = $('add-amount');
-  const submitBtn = $('add-submit');
-
   amountInput.addEventListener('input', () => {
     let val = amountInput.value.replace(/[^\d.,]/g, '').replace(',', '.');
-    /* remove leading zeros */
     val = val.replace(/^0+(\d)/, '$1');
-    /* format with spaces */
     const parts = val.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     amountInput.value = parts.join('.');
     updateSubmitState();
   });
-
-  submitBtn.addEventListener('click', submitTransaction);
+  $('add-submit').addEventListener('click', submitTransaction);
 }
 
 function updateSubmitState() {
-  const amount = parseAmountInput();
-  const btn = $('add-submit');
-  btn.disabled = !(amount > 0 && state.selectedCategory);
+  $('add-submit').disabled = !(parseAmountInput() > 0 && state.selectedCategory);
 }
 
 function parseAmountInput() {
-  const raw = ($('add-amount').value || '').replace(/\s/g, '').replace(',', '.');
-  return parseFloat(raw) || 0;
+  return parseFloat(($('add-amount').value || '').replace(/\s/g, '').replace(',', '.')) || 0;
 }
 
 async function submitTransaction() {
@@ -567,15 +690,12 @@ async function submitTransaction() {
 
   try {
     await api.addTransaction(state.selectedCategory, amount, desc);
-
     hapticNotification('success');
 
-    /* Показуємо анімацію успіху */
     const overlay = $('add-success');
     overlay.classList.add('show');
     setTimeout(() => {
       overlay.classList.remove('show');
-      /* Скидаємо форму */
       $('add-amount').value = '';
       $('add-description').value = '';
       state.selectedCategory = null;
@@ -583,7 +703,6 @@ async function submitTransaction() {
       updateSubmitState();
       navigateTo('dashboard');
     }, 1200);
-
   } catch (e) {
     hapticNotification('error');
     showToast('Помилка: ' + e.message);
@@ -603,10 +722,8 @@ async function loadAnalytics() {
       api.getAnalytics().catch(() => null),
       api.getLimits().catch(() => [])
     ]);
-
     state.analytics = analytics;
     state.limits = limits || [];
-
     renderAnalyticsChart(analytics);
     renderAnalyticsBreakdown(analytics);
     renderAnalyticsLimits(limits);
@@ -617,19 +734,16 @@ async function loadAnalytics() {
 
 function renderAnalyticsChart(analytics) {
   const categories = analytics && analytics.categories ? analytics.categories : [];
-  const chartData = categories.map((cat) => ({
+  drawDonutChart('analytics-chart', categories.map(cat => ({
     label: cat.category,
     value: cat.total || 0,
-    color: getCategoryColor(getCategoryIndex(cat.category))
-  }));
-
-  drawDonutChart('analytics-chart', chartData, 280);
+    color: getCategoryColorStable(cat.category)
+  })), 280);
 }
 
 function renderAnalyticsBreakdown(analytics) {
   const container = $('analytics-breakdown');
   if (!container) return;
-
   const categories = analytics && analytics.categories ? analytics.categories : [];
   const totalSpent = analytics && analytics.total_spent != null ? analytics.total_spent : 0;
 
@@ -645,13 +759,12 @@ function renderAnalyticsBreakdown(analytics) {
   container.innerHTML = categories.map((cat, i) => {
     const amount = cat.total || 0;
     const pct = totalSpent > 0 ? ((amount / totalSpent) * 100).toFixed(1) : 0;
-    const color = getCategoryColor(getCategoryIndex(cat.category));
-    const name = cat.category;
+    const color = getCategoryColorStable(cat.category);
     const emoji = getCategoryIcon(cat.category);
     return '<div class="breakdown-item animate-in" style="animation-delay:' + (i * 0.05) + 's">' +
       '<div class="breakdown-color" style="background:' + color + '"></div>' +
       '<div class="breakdown-info">' +
-        '<div class="breakdown-name">' + emoji + ' ' + escapeHtml(name) + '</div>' +
+        '<div class="breakdown-name">' + emoji + ' ' + escapeHtml(cat.category) + '</div>' +
         '<div class="breakdown-bar-bg"><div class="breakdown-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
       '</div>' +
       '<div class="breakdown-values">' +
@@ -666,11 +779,7 @@ function renderAnalyticsLimits(limits) {
   const section = $('analytics-limits-section');
   const container = $('analytics-limits-bars');
   if (!container || !section) return;
-
-  if (!limits || limits.length === 0) {
-    section.style.display = 'none';
-    return;
-  }
+  if (!limits || limits.length === 0) { section.style.display = 'none'; return; }
   section.style.display = '';
   container.innerHTML = limits.map((lim, i) => buildLimitBar(lim, i)).join('');
 }
@@ -680,11 +789,10 @@ function renderAnalyticsLimits(limits) {
    ================================================================ */
 async function loadLimits() {
   try {
-    const limits = await api.getLimits();
-    state.limits = limits || [];
+    state.limits = await api.getLimits() || [];
     renderLimits(state.limits);
   } catch (e) {
-    showToast('Помилка завантаження лімітів');
+    showErrorState('limits-list', loadLimits);
   }
 }
 
@@ -705,16 +813,14 @@ function renderLimits(limits) {
     const spent = lim.spent || 0;
     const total = lim.limit_amount || 0;
     const pct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
-    const pctFull = total > 0 ? ((spent / total) * 100) : 0;
+    const pctFull = total > 0 ? (spent / total) * 100 : 0;
     const colorClass = pct < 60 ? 'green' : pct < 85 ? 'yellow' : 'red';
     const emoji = getCategoryIcon(lim.category);
-    const name = lim.category;
-
     return '<div class="limit-card animate-in" style="animation-delay:' + (i * 0.06) + 's">' +
       '<div class="limit-card-header">' +
         '<div class="limit-card-left">' +
           '<span class="limit-card-emoji">' + emoji + '</span>' +
-          '<span class="limit-card-name">' + escapeHtml(name) + '</span>' +
+          '<span class="limit-card-name">' + escapeHtml(lim.category) + '</span>' +
         '</div>' +
         '<button class="limit-card-delete" data-id="' + lim.id + '" title="Видалити">✕</button>' +
       '</div>' +
@@ -732,9 +838,8 @@ function renderLimits(limits) {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       hapticImpact('medium');
-      const id = btn.dataset.id;
       try {
-        await api.deleteLimit(id);
+        await api.deleteLimit(btn.dataset.id);
         hapticNotification('success');
         showToast('Ліміт видалено');
         await loadLimits();
@@ -751,13 +856,11 @@ function buildLimitBar(lim, index) {
   const pct = total > 0 ? Math.min((spent / total) * 100, 100) : 0;
   const colorClass = pct < 60 ? 'green' : pct < 85 ? 'yellow' : 'red';
   const emoji = getCategoryIcon(lim.category);
-  const name = lim.category;
-
   return '<div class="limit-card animate-in" style="animation-delay:' + (index * 0.05) + 's">' +
     '<div class="limit-card-header">' +
       '<div class="limit-card-left">' +
         '<span class="limit-card-emoji">' + emoji + '</span>' +
-        '<span class="limit-card-name">' + escapeHtml(name) + '</span>' +
+        '<span class="limit-card-name">' + escapeHtml(lim.category) + '</span>' +
       '</div>' +
       '<span class="limit-pct ' + colorClass + '">' + Math.round(pct) + '%</span>' +
     '</div>' +
@@ -778,7 +881,6 @@ function initLimitModal() {
   const overlay = $('limit-modal-overlay');
   const addBtn = $('limits-add-btn');
   const cancelBtn = $('limit-cancel');
-  const saveBtn = $('limit-save');
   const amountInput = $('limit-amount');
 
   addBtn.addEventListener('click', () => {
@@ -787,9 +889,7 @@ function initLimitModal() {
     overlay.classList.add('open');
   });
 
-  cancelBtn.addEventListener('click', () => {
-    overlay.classList.remove('open');
-  });
+  cancelBtn.addEventListener('click', () => overlay.classList.remove('open'));
 
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.classList.remove('open');
@@ -803,46 +903,29 @@ function initLimitModal() {
     amountInput.value = parts.join('.');
   });
 
-  saveBtn.addEventListener('click', saveLimitFromModal);
+  $('limit-save').addEventListener('click', saveLimitFromModal);
 }
 
 async function populateLimitCategorySelect() {
   if (state.categories.length === 0) {
-    try {
-      const cats = await api.getCategories();
-      state.categories = cats || [];
-    } catch (e) { /* ignore */ }
+    try { state.categories = await api.getCategories() || []; } catch (e) {}
   }
-
   const select = $('limit-category');
   select.innerHTML = '<option value="" disabled selected>Оберіть категорію</option>';
   state.categories.forEach(cat => {
-    const emoji = cat.icon || '📦';
-    const name = cat.name;
     const opt = document.createElement('option');
-    opt.value = name;  // значення = рядок з ім'ям категорії
-    opt.textContent = emoji + ' ' + escapeHtml(name);
+    opt.value = cat.name;
+    opt.textContent = (cat.icon || '📦') + ' ' + cat.name;
     select.appendChild(opt);
   });
-
-  /* Скидання полів */
   $('limit-amount').value = '';
 }
 
 async function saveLimitFromModal() {
-  const category = $('limit-category').value;  // рядок — ім'я категорії
-  const rawAmount = ($('limit-amount').value || '').replace(/\s/g, '').replace(',', '.');
-  const amount = parseFloat(rawAmount) || 0;
-
-  if (!category) {
-    showToast('Оберіть категорію');
-    return;
-  }
-  if (amount <= 0) {
-    showToast('Введіть суму ліміту');
-    return;
-  }
-
+  const category = $('limit-category').value;
+  const amount = parseFloat(($('limit-amount').value || '').replace(/\s/g, '').replace(',', '.')) || 0;
+  if (!category) { showToast('Оберіть категорію'); return; }
+  if (amount <= 0) { showToast('Введіть суму ліміту'); return; }
   try {
     await api.addLimit(category, amount);
     hapticNotification('success');
@@ -863,14 +946,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   initAddScreen();
   initLimitModal();
+  initMonthNav();
+  initHistory();
 
-  /* Активуємо дашборд */
   const dashboard = $('screen-dashboard');
   if (dashboard) {
     dashboard.classList.add('active');
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => dashboard.classList.add('visible'));
-    });
+    requestAnimationFrame(() => requestAnimationFrame(() => dashboard.classList.add('visible')));
   }
 
   loadScreenData('dashboard');

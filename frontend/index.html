@@ -18,7 +18,15 @@
     <section id="screen-dashboard" class="screen active">
       <header class="screen-header">
         <h1 class="screen-title">Головна</h1>
-        <span class="screen-subtitle" id="dashboard-month"></span>
+        <div class="month-nav-row">
+          <button class="month-btn" id="month-prev" aria-label="Попередній місяць">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="screen-subtitle" id="dashboard-month"></span>
+          <button class="month-btn" id="month-next" aria-label="Наступний місяць">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </header>
 
       <div class="total-card glass-card">
@@ -40,7 +48,10 @@
       </div>
 
       <div class="recent-section">
-        <h2 class="section-title">Останні витрати</h2>
+        <div class="section-header-row">
+          <h2 class="section-title">Останні витрати</h2>
+          <button class="see-all-btn" id="dashboard-see-all">Всі →</button>
+        </div>
         <div class="transactions-list" id="dashboard-transactions">
           <div class="empty-state">
             <span class="empty-icon">📭</span>
@@ -122,6 +133,18 @@
       <button class="fab-btn" id="limits-add-btn">
         <span>+</span>
       </button>
+    </section>
+
+    <!-- ===================== HISTORY ===================== -->
+    <section id="screen-history" class="screen">
+      <header class="screen-header screen-header-center">
+        <button class="back-btn" id="history-back" aria-label="Назад">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h1 class="screen-title">Всі витрати</h1>
+        <div class="header-spacer"></div>
+      </header>
+      <div id="history-list" class="transactions-list"></div>
     </section>
 
     <!-- ===================== BOTTOM NAV ===================== -->

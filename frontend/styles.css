@@ -1132,3 +1132,205 @@ body::before {
    ================================================================ */
 
 .hidden { display: none !important; }
+
+/* ================================================================
+   MONTH NAVIGATION
+   ================================================================ */
+
+.month-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.month-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.month-btn:active { transform: scale(0.88); }
+.month-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+/* ================================================================
+   SECTION HEADER ROW
+   ================================================================ */
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-header-row .section-title { margin-bottom: 0; }
+
+.see-all-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: 'Inter', sans-serif;
+  opacity: 0.8;
+  transition: opacity var(--transition);
+}
+
+.see-all-btn:active { opacity: 1; }
+
+/* ================================================================
+   TRANSACTION DELETE BUTTON
+   ================================================================ */
+
+.tx-delete-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: rgba(240,78,55,0.1);
+  color: var(--red);
+  border-radius: 7px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition), transform var(--transition), background var(--transition);
+  margin-left: 4px;
+  line-height: 1;
+}
+
+/* Always visible on touch devices */
+@media (hover: none) {
+  .tx-delete-btn { opacity: 1; }
+}
+
+.transaction-item:hover .tx-delete-btn { opacity: 1; }
+
+.tx-delete-btn:active {
+  transform: scale(0.88);
+  background: rgba(240,78,55,0.22);
+}
+
+/* ================================================================
+   HISTORY SCREEN
+   ================================================================ */
+
+.screen-header-center { align-items: center; }
+
+.back-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.back-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.1); }
+
+.header-spacer { width: 36px; flex-shrink: 0; }
+
+.tx-date-group {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 16px 0 8px;
+}
+
+/* ================================================================
+   SKELETON LOADERS
+   ================================================================ */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-tx {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 15px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+/* Pulse for total amount while loading */
+.total-amount.loading {
+  animation: amountPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes amountPulse {
+  0%, 100% { opacity: 0.25; }
+  50%       { opacity: 0.5; }
+}
+
+/* ================================================================
+   ERROR STATE
+   ================================================================ */
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 44px 20px;
+  gap: 10px;
+}
+
+.error-icon { font-size: 32px; opacity: 0.6; }
+
+.error-text {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.retry-btn {
+  margin-top: 6px;
+  padding: 10px 28px;
+  border-radius: 40px;
+  background: rgba(99,102,241,0.12);
+  color: var(--accent-1);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid rgba(99,102,241,0.22);
+}
+
+.retry-btn:active { transform: scale(0.96); background: rgba(99,102,241,0.22); }
